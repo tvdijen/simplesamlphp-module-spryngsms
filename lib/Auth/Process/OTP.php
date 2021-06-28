@@ -12,17 +12,18 @@ declare(strict_types=1);
 
 namespace SimpleSAML\Module\spryngsms\Auth\Process;
 
-use DomainException;
+use RuntimeException;
+use SAML2\Constants;
 use SimpleSAML\Assert\Assert;
 use SimpleSAML\Auth;
 use SimpleSAML\Configuration;
 use SimpleSAML\Error;
 use SimpleSAML\Module;
-use SimpleSAML\SAML2\Constants;
 use SimpleSAML\Utils;
 use Spryng\SpryngRestApi\Http\Response;
 use Spryng\SpryngRestApi\Objects\Message;
 use Spryng\SpryngRestApi\Spryng;
+use UnexpectedValueException;
 
 class OTP extends Auth\ProcessingFilter
 {
@@ -55,18 +56,18 @@ class OTP extends Auth\ProcessingFilter
         Assert::notNull(
             $api_key,
             'Missing required REST API key for the Spryng service.',
-            CriticalConfigurationError::class
+            Error\CriticalConfigurationError::class
         );
 
         $originator = $moduleConfig->getString('originator', 'Spryng SMS');
-        Assert::notEmpty($originator, 'Originator cannot be an empty string', CriticalConfigurationError::class);
-        Assert::alnum($originator, 'Originator must be an alphanumeric string', CriticalConfigurationError::class);
+        Assert::notEmpty($originator, 'Originator cannot be an empty string', Error\CriticalConfigurationError::class);
+        Assert::alnum($originator, 'Originator must be an alphanumeric string', Error\CriticalConfigurationError::class);
 
         $mobilePhoneAttribute = $moduleConfig->getString('mobilePhoneAttribute', 'mobile');
         Assert::notEmpty(
             $mobilePhoneAttribute,
             'mobilePhoneAttribute cannot be an empty string',
-            CriticalConfigurationError::class
+            Error\CriticalConfigurationError::class
         );
 
         $this->api_key = $api_key;
@@ -81,12 +82,12 @@ class OTP extends Auth\ProcessingFilter
      * This function saves the state, and redirects the user to the page where the user can enter the OTP
      * code sent to them.
      *
-     * @param array &$state The state of the response.
+     * @param array &$request The state of the response.
      */
-    public function process(array &$state): void
+    public function process(array &$request): void
     {
         // user interaction necessary. Throw exception on isPassive request
-        if (isset($state['isPassive']) && $state['isPassive'] === true) {
+        if (isset($request['isPassive']) && $request['isPassive'] === true) {
             throw new Module\saml\Error\NoPassive(
                 Constants::STATUS_REQUESTER,
                 'Unable to enter verification code on passive request.'
@@ -94,7 +95,7 @@ class OTP extends Auth\ProcessingFilter
         }
 
         // Retrieve the user's mobile phone number
-        $recipient = $this->getMobilePhoneAttribute();
+        $recipient = $this->getMobilePhoneAttribute($request);
 
         // Sanitize the user's mobile phone number
         $recipient = $this->sanitizeMobilePhoneNumber($recipient);
@@ -106,18 +107,18 @@ class OTP extends Auth\ProcessingFilter
         Assert::length($code, 6, UnexpectedValueException::class);
 
         // Send SMS
-        $this->sendMessage($code);
+        $this->sendMessage($code, $recipient);
 
         // Salt & hash it
         $cryptoUtils = new Utils\Crypto();
         $hash = $cryptoUtils->pwHash($code);
 
         // Store hash & time
-        $state['spryngsms:hash'] = $hash;
-        $state['spryngsms:timestamp'] = time();
+        $request['spryngsms:hash'] = $hash;
+        $request['spryngsms:timestamp'] = time();
 
         // Save state and redirect
-        $id = Auth\State::saveState($state, 'spryngsms:request');
+        $id = Auth\State::saveState($request, 'spryngsms:request');
         $url = Module::getModuleURL('spryngsms/validate');
 
         $httpUtils = new Utils\HTTP();
@@ -189,9 +190,9 @@ class OTP extends Auth\ProcessingFilter
      *
      * @param string $recipient
      * @return string
-     * @throws \RuntimeException if the mobile phone number contains illegal characters or is otherwise invalid.
+     * @throws \UnexpectedValueException if the mobile phone number contains illegal characters or is otherwise invalid.
      */
-    protected function sanitizeMobilePhoneAttribute(string $recipient): string
+    protected function sanitizeMobilePhoneNumber(string $recipient): string
     {
         $recipient = preg_replace('/^([+]?[0]?[0]?)(.*)/', '$2', $recipient);
         $recipient = str_replace($recipient, '-', '');
