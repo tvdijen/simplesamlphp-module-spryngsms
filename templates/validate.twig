@@ -1,0 +1,71 @@
+{% set pagetitle = 'Enter your verification code'|trans %}
+
+{% extends "@core/base.twig" %}
+
+{% block postload %}
+{#    <script src="{{ asset('js/loginuserpass.js', 'core') }}"></script>#}
+{% endblock %}
+
+{% block content %}
+    {%- if not isProduction %}
+
+    <div class="message-box warning">
+      {% trans %}You are now accessing a pre-production system. This authentication setup
+      {#- #} is for testing and pre-production verification only. If someone sent you
+      {#- #} a link that pointed you here, and you are not <i>a tester</i> you
+      {#- #} probably got the wrong link, and should <b>not be here</b>.{% endtrans %}
+    </div>
+    {% endif -%}
+    {% if errorcode -%}
+    <div class="pure-g">
+        <div class="pure-u-1">
+            <div class="message-box error">
+
+                {% set errtitles = errorcodes['title'] %}
+                {% set errtitle = errtitles[errorcode] %}
+
+                <h3>{{ errtitle|trans(errorparams) }}</h3>
+
+                {% set errdescs = errorcodes['descr'] %}
+                {% set errdesc = errdescs[errorcode] %}
+
+                <p>{{ errdesc|trans(errorparams) }}</p>
+
+            </div>
+        </div>
+    </div>
+    {%- endif %}
+
+    <h1>{{ 'Enter your verification code'|trans }}</h1>
+
+    <p>{{ 'A service has requested you to provide an additional verification code. Please enter the verification code that was sent to your mobile phone below.'|trans }}</p>
+    <br>
+    <div class="center">
+        <form class="pure-form pure-form-aligned center-form" action="?" method="post" name="f">
+            <div class="form-align">
+
+                <div class="pure-control-group">
+                    <label for="otp">{{ 'Verification code'|trans }}</label>
+                    <input id="otp" type="password" tabindex="2" name="otp" class="edge" autofocus />
+                </div>
+            </div> <!-- form-align-->
+            <br><br>
+            {%- for name, value in stateparams %}
+            <input type="hidden" name="{{ name }}" value="{{ value }}">
+            {%- endfor %}
+
+            <button class="pure-button pure-button-red pure-input-1-2 pure-input-sm-1-1 right" id="submit_button"
+                    type="submit" tabindex="6" data-processing="{% trans %}Processing...{% endtrans %}">
+              {% trans %}Proceed{% endtrans %}
+            </button>
+        </form>
+    </div>
+
+    <br><br>
+    <div class="pure-form-message">
+        <strong>{{ 'Help! I haven't received an SMS.'|trans }}</strong>
+        <p>{{ 'Click here to send another one (TODO)!'|trans }}</p>
+    </div>
+
+{% endblock %}
+
