@@ -30,7 +30,8 @@
         "php": ">=7.4 || ^8.0",
         "simplesamlphp/assert": "^0.2.6",
         "simplesamlphp/composer-module-installer": "~1.1",
-        "simplesamlphp/simplesamlphp": "dev-master"
+        "simplesamlphp/simplesamlphp": "dev-master",
+        "spryng/rest-api-php": "^1.1.0"
     },
     "require-dev": {
         "simplesamlphp/simplesamlphp-test-framework": "^1.1.0"
