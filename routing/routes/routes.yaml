@@ -1,0 +1,7 @@
+spryngsms-enterCode:
+    path:       /enterCode
+    defaults:   { _controller: 'SimpleSAML\Module\spryngsms\Controller\OTP::enterCode' }
+spryngsms-validateCode:
+    path:       /validateCode
+    defaults:   { _controller: 'SimpleSAML\Module\spryngsms\Controller\OTP::validateCode' }
+

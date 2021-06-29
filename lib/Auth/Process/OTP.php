@@ -19,10 +19,8 @@ use SimpleSAML\Auth;
 use SimpleSAML\Configuration;
 use SimpleSAML\Error;
 use SimpleSAML\Module;
+use SimpleSAML\Module\spryngsms\Utils\OTP as OTPUtils;
 use SimpleSAML\Utils;
-use Spryng\SpryngRestApi\Http\Response;
-use Spryng\SpryngRestApi\Objects\Message;
-use Spryng\SpryngRestApi\Spryng;
 use UnexpectedValueException;
 
 class OTP extends Auth\ProcessingFilter
@@ -45,7 +43,7 @@ class OTP extends Auth\ProcessingFilter
      * @param array $config Configuration information.
      * @param mixed $reserved For future use.
      *
-     * @throws \SimpleSAML\Error\CriticalConfigurationError if the required REST API key is missing.
+     * @throws \SimpleSAML\Error\ConfigurationError if the required REST API key is missing.
      */
     public function __construct(array $config, $reserved)
     {
@@ -56,18 +54,18 @@ class OTP extends Auth\ProcessingFilter
         Assert::notNull(
             $api_key,
             'Missing required REST API key for the Spryng service.',
-            Error\CriticalConfigurationError::class
+            Error\ConfigurationError::class
         );
 
         $originator = $moduleConfig->getString('originator', 'Spryng SMS');
-        Assert::notEmpty($originator, 'Originator cannot be an empty string', Error\CriticalConfigurationError::class);
-        Assert::alnum($originator, 'Originator must be an alphanumeric string', Error\CriticalConfigurationError::class);
+        Assert::notEmpty($originator, 'Originator cannot be an empty string', Error\ConfigurationError::class);
+        Assert::alnum($originator, 'Originator must be an alphanumeric string', Error\ConfigurationError::class);
 
         $mobilePhoneAttribute = $moduleConfig->getString('mobilePhoneAttribute', 'mobile');
         Assert::notEmpty(
             $mobilePhoneAttribute,
             'mobilePhoneAttribute cannot be an empty string',
-            Error\CriticalConfigurationError::class
+            Error\ConfigurationError::class
         );
 
         $this->api_key = $api_key;
@@ -98,16 +96,17 @@ class OTP extends Auth\ProcessingFilter
         $recipient = $this->getMobilePhoneAttribute($request);
 
         // Sanitize the user's mobile phone number
-        $recipient = $this->sanitizeMobilePhoneNumber($recipient);
+        $otpUtils = new OTPUtils();
+        $recipient = $otpUtils->sanitizeMobilePhoneNumber($recipient);
 
         // Generate the OTP
-        $code = $this->generateOneTimePassword();
+        $code = $otpUtils->generateOneTimePassword();
 
         Assert::digits($code, UnexpectedValueException::class);
         Assert::length($code, 6, UnexpectedValueException::class);
 
         // Send SMS
-        $this->sendMessage($code, $recipient);
+        $otpUtils->sendMessage($this->api_key, $code, $recipient, $this->originator);
 
         // Salt & hash it
         $cryptoUtils = new Utils\Crypto();
@@ -119,44 +118,10 @@ class OTP extends Auth\ProcessingFilter
 
         // Save state and redirect
         $id = Auth\State::saveState($request, 'spryngsms:request');
-        $url = Module::getModuleURL('spryngsms/validate');
+        $url = Module::getModuleURL('spryngsms/validateCode');
 
         $httpUtils = new Utils\HTTP();
         $httpUtils->redirectTrustedURL($url, ['StateId' => $id]);
-    }
-
-
-    /**
-     * Generate a 6-digit random code
-     *
-     * @return string
-     */
-    private function generateOneTimePassword(): string
-    {
-        $code = sprintf("%06d", mt_rand(10000, 999999));
-        $padded = str_pad($code, 6, '0', STR_PAD_LEFT);
-
-        return $padded;
-    }
-
-
-    /**
-     * Send OTP SMS
-     *
-     * @param string $code
-     * @param string $recipient
-     * @return \Spryng\SpryngRestApi\Http\Response
-     */
-    private function sendMessage(string $code, string $recipient): Response
-    {
-        $spryng = new Spryng($this->api_key);
-
-        $message = new Message();
-        $message->setBody($code);
-        $message->setRecipients([$recipient]);
-        $message->setOriginator($this->originator);
-
-        return $spryng->message->create($message);
     }
 
 
@@ -182,24 +147,5 @@ class OTP extends Auth\ProcessingFilter
         }
 
         return $state['Attributes'][$this->mobilePhoneAttribute][0];
-    }
-
-
-    /**
-     * Sanitize the mobile phone number for use with the Spryng Rest API
-     *
-     * @param string $recipient
-     * @return string
-     * @throws \UnexpectedValueException if the mobile phone number contains illegal characters or is otherwise invalid.
-     */
-    protected function sanitizeMobilePhoneNumber(string $recipient): string
-    {
-        $recipient = preg_replace('/^([+]?[0]?[0]?)(.*)/', '$2', $recipient);
-        $recipient = str_replace($recipient, '-', '');
-
-        Assert::notEmpty($recipient, 'spryngsms:OTP: mobile phone number cannot be an empty string.');
-        Assert::digits($recipient, UnexpectedValueException::class);
-
-        return $recipient;
     }
 }
