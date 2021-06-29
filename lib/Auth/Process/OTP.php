@@ -18,6 +18,7 @@ use SimpleSAML\Assert\Assert;
 use SimpleSAML\Auth;
 use SimpleSAML\Configuration;
 use SimpleSAML\Error;
+use SimpleSAML\Logger;
 use SimpleSAML\Module;
 use SimpleSAML\Module\spryngsms\Utils\OTP as OTPUtils;
 use SimpleSAML\Utils;
@@ -57,7 +58,7 @@ class OTP extends Auth\ProcessingFilter
             Error\ConfigurationError::class
         );
 
-        $originator = $moduleConfig->getString('originator', 'Spryng SMS');
+        $originator = $moduleConfig->getString('originator', 'SpryngSMS');
         Assert::notEmpty($originator, 'Originator cannot be an empty string', Error\ConfigurationError::class);
         Assert::alnum($originator, 'Originator must be an alphanumeric string', Error\ConfigurationError::class);
 
@@ -99,26 +100,12 @@ class OTP extends Auth\ProcessingFilter
         $otpUtils = new OTPUtils();
         $recipient = $otpUtils->sanitizeMobilePhoneNumber($recipient);
 
-        // Generate the OTP
-        $code = $otpUtils->generateOneTimePassword();
-
-        Assert::digits($code, UnexpectedValueException::class);
-        Assert::length($code, 6, UnexpectedValueException::class);
-
-        // Send SMS
-        $otpUtils->sendMessage($this->api_key, $code, $recipient, $this->originator);
-
-        // Salt & hash it
-        $cryptoUtils = new Utils\Crypto();
-        $hash = $cryptoUtils->pwHash($code);
-
-        // Store hash & time
-        $request['spryngsms:hash'] = $hash;
-        $request['spryngsms:timestamp'] = time();
+        $request['spryngsms:originator'] = $this->originator;
+        $request['spryngsms:recipient'] = $recipient;
 
         // Save state and redirect
         $id = Auth\State::saveState($request, 'spryngsms:request');
-        $url = Module::getModuleURL('spryngsms/validateCode');
+        $url = Module::getModuleURL('spryngsms/sendCode');
 
         $httpUtils = new Utils\HTTP();
         $httpUtils->redirectTrustedURL($url, ['StateId' => $id]);

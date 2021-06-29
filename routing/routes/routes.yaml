@@ -4,4 +4,10 @@ spryngsms-enterCode:
 spryngsms-validateCode:
     path:       /validateCode
     defaults:   { _controller: 'SimpleSAML\Module\spryngsms\Controller\OTP::validateCode' }
+spryngsms-promptResend:
+    path:       /promptResend
+    defaults:   { _controller: 'SimpleSAML\Module\spryngsms\Controller\OTP::promptResend' }
+spryngsms-sendCode:
+    path:       /sendCode
+    defaults:   { _controller: 'SimpleSAML\Module\spryngsms\Controller\OTP::sendCode' }
 

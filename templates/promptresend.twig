@@ -1,0 +1,37 @@
+{% set pagetitle = 'Enter your verification code'|trans %}
+
+{% extends "@core/base.twig" %}
+
+{% block content %}
+    {%- if not isProduction %}
+
+    <div class="message-box warning">
+      {% trans %}You are now accessing a pre-production system. This authentication setup
+      {#- #} is for testing and pre-production verification only. If someone sent you
+      {#- #} a link that pointed you here, and you are not <i>a tester</i> you
+      {#- #} probably got the wrong link, and should <b>not be here</b>.{% endtrans %}
+    </div>
+    {% endif -%}
+
+    {% if message is defined -%}
+    <div class="pure-g">
+        <div class="pure-u-1">
+            <div class="message-box error">
+                <h3>{{ message }}</h3>
+            </div>
+        </div>
+    </div>
+    {%- endif %}
+
+    <h3>{{ 'Please click the Resend-button below to retry sending an SMS'|trans }}</h3>
+
+    <div class="center">
+        <form class="pure-form pure-form-aligned center-form" action="{{ moduleURL('spryngsms/sendCode') ~ '?StateId=' ~ StateId }}" method="post" name="f">
+            <button class="pure-button pure-button-red pure-input-1-2 pure-input-sm-1-1 right" id="submit_button"
+                    type="submit" tabindex="1" data-processing="{% trans %}Resending...{% endtrans %}">
+              {% trans %}Resend{% endtrans %}
+            </button>
+        </form>
+    </div>
+{% endblock %}
+
