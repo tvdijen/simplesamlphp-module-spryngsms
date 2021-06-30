@@ -39,16 +39,10 @@ class OTP
     /** @var \SimpleSAML\Session */
     protected Session $session;
 
-    /**
-     * @var \SimpleSAML\Utils\HTTP|string
-     * @psalm-var \SimpleSAML\Utils\HTTP|class-string
-     */
+    /** @var \SimpleSAML\Utils\HTTP */
     protected Utils\HTTP $httpUtils;
 
-    /**
-     * @var \SimpleSAML\Module\spryngsms\Utils\OTP|string
-     * @psalm-var \SimpleSAML\Module\spryngsms\Utils\OTP|class-string
-     */
+    /** @var \SimpleSAML\Module\spryngsms\Utils\OTP */
     protected OTPUtils $otpUtils;
 
     /**
