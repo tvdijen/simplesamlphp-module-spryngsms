@@ -61,11 +61,9 @@ class OTP
      */
     public function sanitizeMobilePhoneNumber(string $recipient): string
     {
-        $recipient = preg_replace('/^([+]|[0]{1,2})?(.*)/', '$2', $recipient);
-        $recipient = str_replace('-', '', $recipient);
-
+        $recipient = preg_replace('/[^0-9]/', '', $recipient);
         Assert::notEmpty($recipient, 'spryngsms:OTP: mobile phone number cannot be an empty string.');
-        Assert::digits($recipient, UnexpectedValueException::class);
+//        Assert::digits($recipient, UnexpectedValueException::class);
 
         return $recipient;
     }
