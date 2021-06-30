@@ -40,6 +40,18 @@ class OTP
     protected Session $session;
 
     /**
+     * @var \SimpleSAML\Utils\HTTP|string
+     * @psalm-var \SimpleSAML\Utils\HTTP|class-string
+     */
+    protected Utils\HTTP $httpUtils;
+
+    /**
+     * @var \SimpleSAML\Module\spryngsms\Utils\OTP|string
+     * @psalm-var \SimpleSAML\Module\spryngsms\Utils\OTP|class-string
+     */
+    protected OTPUtils $otpUtils;
+
+    /**
      * @var \SimpleSAML\Auth\State|string
      * @psalm-var \SimpleSAML\Auth\State|class-string
      */
@@ -55,6 +67,8 @@ class OTP
     public function __construct(Configuration $config, Session $session)
     {
         $this->config = $config;
+        $this->httpUtils = new Utils\HTTP();
+        $this->otpUtils = new OTPUtils();
         $this->moduleConfig = Configuration::getConfig('module_spryngsms.php');
         $this->session = $session;
     }
@@ -68,6 +82,28 @@ class OTP
     public function setLogger(Logger $logger): void
     {
         $this->logger = $logger;
+    }
+
+
+    /**
+     * Inject the \SimpleSAML\Utils\HTTP dependency.
+     *
+     * @param \SimpleSAML\Utils\HTTP $httpUtils
+     */
+    public function setHttpUtils(Utils\HTTP $httpUtils): void
+    {
+        $this->httpUtils = $httpUtils;
+    }
+
+
+    /**
+     * Inject the \SimpleSAML\Module\spryngsms\Utils\OTP dependency.
+     *
+     * @param \SimpleSAML\Module\spryngsms\Utils\OTP $otpUtils
+     */
+    public function setOtpUtils(OTPUtils $otpUtils): void
+    {
+        $this->otpUtils = $otpUtils;
     }
 
 
@@ -89,16 +125,16 @@ class OTP
      */
     public function enterCode(Request $request): Template
     {
-        $id = $request->get('StateId', null);
+        $id = $request->get('AuthState', null);
         if ($id === null) {
-            throw new Error\BadRequest('Missing required StateId query parameter.');
+            throw new Error\BadRequest('Missing AuthState parameter.');
         }
 
         $state = $this->authState::loadState($id, 'spryngsms:request');
 
         $t = new Template($this->config, 'spryngsms:entercode.twig');
         $t->data = [
-            'StateId' => $id,
+            'AuthState' => $id,
             'stateparams' => [],
         ];
 
@@ -113,9 +149,9 @@ class OTP
      */
     public function validateCode(Request $request): RunnableResponse
     {
-        $id = $request->get('StateId', null);
+        $id = $request->get('AuthState', null);
         if ($id === null) {
-            throw new Error\BadRequest('Missing required StateId query parameter.');
+            throw new Error\BadRequest('Missing AuthState parameter.');
         }
 
         $state = $this->authState::loadState($id, 'spryngsms:request');
@@ -123,7 +159,6 @@ class OTP
         Assert::keyExists($state, 'spryngsms:timestamp');
         Assert::positiveInteger($state['spryngsms:timestamp']);
 
-        $httpUtils = new Utils\HTTP();
         $timestamp = $state['spryngsms:timestamp'];
         $validUntil = $timestamp + $this->moduleConfig->getInteger('validUntil', 600);
 
@@ -132,9 +167,9 @@ class OTP
             $state['spryngsms:expired'] = true;
 
             $id = Auth\State::saveState($state, 'spryngsms:request');
-            $url = Module::getModuleURL('spryngsms/enterCode');
+            $url = Module::getModuleURL('spryngsms/resendCode');
 
-            return new RunnableResponse([$httpUtils, 'redirectTrustedURL'], [$url, ['StateId' => $id]]);
+            return new RunnableResponse([$this->httpUtils, 'redirectTrustedURL'], [$url, ['AuthState' => $id]]);
         }
 
         Assert::keyExists($state, 'spryngsms:hash');
@@ -148,9 +183,9 @@ class OTP
             $state['spryngsms:invalid'] = true;
 
             $id = Auth\State::saveState($state, 'spryngsms:request');
-            $url = Module::getModuleURL('spryngsms/promptResend');
+            $url = Module::getModuleURL('spryngsms/enterCode');
 
-            return new RunnableResponse([$httpUtils, 'redirectTrustedURL'], [$url, ['StateId' => $id]]);
+            return new RunnableResponse([$this->httpUtils, 'redirectTrustedURL'], [$url, ['AuthState' => $id]]);
         }
     }
 
@@ -162,16 +197,16 @@ class OTP
      */
     public function promptResend(Request $request): Template
     {
-        $id = $request->get('StateId', null);
+        $id = $request->get('AuthState', null);
         if ($id === null) {
-            throw new Error\BadRequest('Missing required StateId query parameter.');
+            throw new Error\BadRequest('Missing AuthState parameter.');
         }
 
         $state = $this->authState::loadState($id, 'spryngsms:request');
 
         $t = new Template($this->config, 'spryngsms:promptresend.twig');
         $t->data = [
-            'StateId' => $id,
+            'AuthState' => $id,
         ];
 
         if (isset($state['spryngsms:expired']) && ($state['spryngsms:expired'] === true)) {
@@ -196,16 +231,15 @@ class OTP
      */
     public function sendCode(Request $request): RunnableResponse
     {
-        $id = $request->get('StateId', null);
+        $id = $request->get('AuthState', null);
         if ($id === null) {
-            throw new Error\BadRequest('Missing required StateId query parameter.');
+            throw new Error\BadRequest('Missing AuthState parameter.');
         }
 
         $state = $this->authState::loadState($id, 'spryngsms:request');
 
         // Generate the OTP
-        $otpUtils = new OTPUtils();
-        $code = $otpUtils->generateOneTimePassword();
+        $code = $this->otpUtils->generateOneTimePassword();
 
         Assert::digits($code, UnexpectedValueException::class);
         Assert::length($code, 6, UnexpectedValueException::class);
@@ -221,7 +255,7 @@ class OTP
         Assert::keyExists($state, 'spryngsms:originator');
 
         // Send SMS
-        $response = $otpUtils->sendMessage(
+        $response = $this->otpUtils->sendMessage(
             $api_key,
             $code,
             $state['spryngsms:recipient'],
@@ -229,7 +263,7 @@ class OTP
         );
 
         if ($response->wasSuccessful()) {
-            Logger::info("Message with ID " . $response->toObject()->getId() . " was send successfully!");
+            $this->logger::info("Message with ID " . $response->toObject()->getId() . " was send successfully!");
 
             // Salt & hash it
             $cryptoUtils = new Utils\Crypto();
@@ -249,7 +283,7 @@ class OTP
                 $msg = "Message could not be send. Response code: " . $response->getResponseCode();
             }
 
-            Logger::error($msg);
+            $this->logger::error($msg);
             $state['spryngsms:sendFailure'] = $msg;
 
             // Save state and redirect
@@ -257,7 +291,6 @@ class OTP
             $url = Module::getModuleURL('spryngsms/promptResend');
         }
 
-        $httpUtils = new Utils\HTTP();
-        return new RunnableResponse([$httpUtils, 'redirectTrustedURL'], [$url, ['StateId' => $id]]);
+        return new RunnableResponse([$this->httpUtils, 'redirectTrustedURL'], [$url, ['AuthState' => $id]]);
     }
 }

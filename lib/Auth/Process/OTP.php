@@ -108,7 +108,7 @@ class OTP extends Auth\ProcessingFilter
         $url = Module::getModuleURL('spryngsms/sendCode');
 
         $httpUtils = new Utils\HTTP();
-        $httpUtils->redirectTrustedURL($url, ['StateId' => $id]);
+        $httpUtils->redirectTrustedURL($url, ['AuthState' => $id]);
     }
 
 

@@ -26,7 +26,7 @@
     <h3>{{ 'Please click the Resend-button below to retry sending an SMS'|trans }}</h3>
 
     <div class="center">
-        <form class="pure-form pure-form-aligned center-form" action="{{ moduleURL('spryngsms/sendCode') ~ '?StateId=' ~ StateId }}" method="post" name="f">
+        <form class="pure-form pure-form-aligned center-form" action="{{ moduleURL('spryngsms/sendCode') ~ '?AuthState=' ~ StateId }}" method="post" name="f">
             <button class="pure-button pure-button-red pure-input-1-2 pure-input-sm-1-1 right" id="submit_button"
                     type="submit" tabindex="1" data-processing="{% trans %}Resending...{% endtrans %}">
               {% trans %}Resend{% endtrans %}
