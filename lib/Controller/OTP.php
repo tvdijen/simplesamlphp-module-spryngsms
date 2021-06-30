@@ -263,7 +263,9 @@ class OTP
         );
 
         if ($response->wasSuccessful()) {
-            $this->logger::info("Message with ID " . $response->toObject()->getId() . " was send successfully!");
+            /** @var \Spryng\SpryngRestApi\Objects\Message $message */
+            $message = $response->toObject();
+            $this->logger::info("Message with ID " . $message->getId() . " was send successfully!");
 
             // Salt & hash it
             $cryptoUtils = new Utils\Crypto();
