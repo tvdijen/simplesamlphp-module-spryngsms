@@ -124,7 +124,7 @@ class OTP
             throw new Error\BadRequest('Missing AuthState parameter.');
         }
 
-        $state = $this->authState::loadState($id, 'spryngsms:request');
+        $this->authState::loadState($id, 'spryngsms:request');
 
         $t = new Template($this->config, 'spryngsms:entercode.twig');
         $t->data = [
