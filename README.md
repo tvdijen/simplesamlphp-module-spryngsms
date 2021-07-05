@@ -4,3 +4,7 @@
 
 SMS as Second Factor module
 ===========================
+
+
+
+!!! NOTE:   This module has been a work-in-progress that was never finished, nor was it ever tested. Feel free to pick up where I left.
